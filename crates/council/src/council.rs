@@ -207,7 +207,7 @@ impl CouncilStore {
         self.post_entry(proto::CouncilEntryKind::Analysis, body, Vec::new(), cx)
     }
 
-    /// Advance the session phase (the Supervisor's prerogative).
+    /// Advance the session phase (Supervisor or Super only, enforced server-side).
     pub fn advance_phase(
         &self,
         phase: proto::CouncilPhase,
@@ -243,6 +243,70 @@ impl CouncilStore {
                 .request(proto::SetCouncilAuthority {
                     session_id,
                     authority: authority as i32,
+                })
+                .await?;
+            Ok(())
+        })
+    }
+
+    /// Submit a proposed list of work items as a task draft (Supervisor or Super).
+    /// The server creates a TaskDraft entry and advances the session to the Gate phase.
+    pub fn submit_task_draft(
+        &self,
+        items: Vec<proto::WorkItem>,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<u64>> {
+        let Some(session_id) = self.session.as_ref().map(|session| session.id) else {
+            return Task::ready(Err(anyhow!("not in a council session")));
+        };
+        let client = self.client.clone();
+        cx.spawn(async move |_, _| {
+            let response = client
+                .request(proto::SubmitTaskDraft { session_id, items })
+                .await?;
+            Ok(response.draft_entry_id)
+        })
+    }
+
+    /// Approve or reject a task draft (Super only, or autonomous Supervisor).
+    /// On approval the server materializes work items and the session finalizes.
+    pub fn approve_task_draft(
+        &self,
+        draft_entry_id: u64,
+        approved: bool,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<Vec<proto::WorkItem>>> {
+        let Some(session_id) = self.session.as_ref().map(|session| session.id) else {
+            return Task::ready(Err(anyhow!("not in a council session")));
+        };
+        let client = self.client.clone();
+        cx.spawn(async move |_, _| {
+            let response = client
+                .request(proto::ApproveTaskDraft {
+                    session_id,
+                    draft_entry_id,
+                    approved,
+                })
+                .await?;
+            Ok(response.work_items)
+        })
+    }
+
+    /// Upsert a work item (Super may edit status / title / description).
+    pub fn upsert_work_item(
+        &self,
+        item: proto::WorkItem,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<()>> {
+        let Some(session_id) = self.session.as_ref().map(|session| session.id) else {
+            return Task::ready(Err(anyhow!("not in a council session")));
+        };
+        let client = self.client.clone();
+        cx.spawn(async move |_, _| {
+            client
+                .request(proto::UpsertWorkItem {
+                    session_id,
+                    item: Some(item),
                 })
                 .await?;
             Ok(())

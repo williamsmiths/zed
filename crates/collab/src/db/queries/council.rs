@@ -5,6 +5,29 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
     QueryOrder,
 };
+use serde::{Deserialize, Serialize};
+
+/// Items serialized into a TaskDraft entry body.
+#[derive(Serialize, Deserialize)]
+struct DraftItem {
+    title: String,
+    description: String,
+    sort_order: i32,
+}
+
+fn valid_phase_transition(from: CouncilPhase, to: CouncilPhase) -> bool {
+    use CouncilPhase::*;
+    matches!(
+        (from, to),
+        (Frame, Diverge)
+            | (Diverge, Converge)
+            | (Converge, Synthesize)
+            | (Converge, Diverge)
+            | (Synthesize, Gate)
+            | (Gate, Finalized)
+            | (Gate, Synthesize)
+    )
+}
 
 impl Database {
     /// Join (or open) the council session for a project. Creates the session if
@@ -171,10 +194,12 @@ impl Database {
         .await
     }
 
-    /// Advance the lifecycle phase of a council session (driven by the Supervisor).
+    /// Advance the lifecycle phase of a council session.
+    /// Only the Supervisor (or Super as kill-switch) may call this.
     pub async fn advance_council_phase(
         &self,
         session_id: CouncilSessionId,
+        user_id: UserId,
         phase: CouncilPhase,
     ) -> Result<council_session::Model> {
         self.transaction(move |tx| async move {
@@ -182,6 +207,28 @@ impl Database {
                 .one(&*tx)
                 .await?
                 .ok_or_else(|| anyhow!("no such council session"))?;
+
+            let caller = council_participant::Entity::find()
+                .filter(council_participant::Column::SessionId.eq(session_id))
+                .filter(council_participant::Column::UserId.eq(user_id))
+                .filter(council_participant::Column::Active.eq(true))
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("you are not a participant in this council session"))?;
+            if caller.kind != CouncilParticipantKind::Supervisor
+                && caller.kind != CouncilParticipantKind::Super
+            {
+                Err(anyhow!("only the Supervisor (or Super) may advance the phase"))?;
+            }
+
+            if !valid_phase_transition(session.phase, phase) {
+                Err(anyhow!(
+                    "invalid phase transition: {:?} → {:?}",
+                    session.phase,
+                    phase
+                ))?;
+            }
+
             let mut session = session.into_active_model();
             session.phase = ActiveValue::Set(phase);
             Ok(session.update(&*tx).await?)
@@ -189,13 +236,26 @@ impl Database {
         .await
     }
 
-    /// Change who holds final authority in the session (Super only, at the RPC layer).
+    /// Change who holds final authority in the session.
+    /// Only the Super may call this.
     pub async fn set_council_authority(
         &self,
         session_id: CouncilSessionId,
+        user_id: UserId,
         authority: CouncilAuthority,
     ) -> Result<council_session::Model> {
         self.transaction(move |tx| async move {
+            let caller = council_participant::Entity::find()
+                .filter(council_participant::Column::SessionId.eq(session_id))
+                .filter(council_participant::Column::UserId.eq(user_id))
+                .filter(council_participant::Column::Active.eq(true))
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("you are not a participant in this council session"))?;
+            if caller.kind != CouncilParticipantKind::Super {
+                Err(anyhow!("only the Super may change the authority setting"))?;
+            }
+
             let session = council_session::Entity::find_by_id(session_id)
                 .one(&*tx)
                 .await?
@@ -203,6 +263,206 @@ impl Database {
             let mut session = session.into_active_model();
             session.authority = ActiveValue::Set(authority);
             Ok(session.update(&*tx).await?)
+        })
+        .await
+    }
+
+    /// Submit a draft list of work items (Supervisor or Super only).
+    /// Creates a TaskDraft entry and advances the session to the Gate phase.
+    pub async fn submit_task_draft(
+        &self,
+        session_id: CouncilSessionId,
+        user_id: UserId,
+        items: Vec<proto::WorkItem>,
+    ) -> Result<(council_entry::Model, Vec<proto::WorkItem>)> {
+        self.transaction(move |tx| {
+            let items = items.clone();
+            async move {
+                let session = council_session::Entity::find_by_id(session_id)
+                    .one(&*tx)
+                    .await?
+                    .ok_or_else(|| anyhow!("no such council session"))?;
+
+                let author = council_participant::Entity::find()
+                    .filter(council_participant::Column::SessionId.eq(session_id))
+                    .filter(council_participant::Column::UserId.eq(user_id))
+                    .filter(council_participant::Column::Active.eq(true))
+                    .one(&*tx)
+                    .await?
+                    .ok_or_else(|| anyhow!("you are not a participant in this council session"))?;
+                if author.kind != CouncilParticipantKind::Supervisor
+                    && author.kind != CouncilParticipantKind::Super
+                {
+                    Err(anyhow!("only the Supervisor (or Super) may submit a task draft"))?;
+                }
+
+                let draft_items: Vec<DraftItem> = items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, item)| DraftItem {
+                        title: item.title.clone(),
+                        description: item.description.clone(),
+                        sort_order: item.sort_order.max(0).max(i as i32),
+                    })
+                    .collect();
+                let body = serde_json::to_string(&draft_items)
+                    .unwrap_or_else(|_| "[]".to_string());
+
+                let max_lamport = council_entry::Entity::find()
+                    .filter(council_entry::Column::SessionId.eq(session_id))
+                    .order_by_desc(council_entry::Column::LamportValue)
+                    .one(&*tx)
+                    .await?
+                    .map_or(0, |e| e.lamport_value);
+
+                let entry = council_entry::ActiveModel {
+                    session_id: ActiveValue::Set(session_id),
+                    author_participant_id: ActiveValue::Set(author.id),
+                    lamport_value: ActiveValue::Set(max_lamport + 1),
+                    lamport_replica_id: ActiveValue::Set(author.replica_id),
+                    kind: ActiveValue::Set(CouncilEntryKind::TaskDraft),
+                    body: ActiveValue::Set(body),
+                    refs: ActiveValue::Set("[]".to_string()),
+                    ..Default::default()
+                }
+                .insert(&*tx)
+                .await?;
+
+                // Advance to Gate phase if currently in Synthesize.
+                if session.phase == CouncilPhase::Synthesize {
+                    let mut session = session.into_active_model();
+                    session.phase = ActiveValue::Set(CouncilPhase::Gate);
+                    session.update(&*tx).await?;
+                }
+
+                Ok((entry, items))
+            }
+        })
+        .await
+    }
+
+    /// Approve or reject a task draft.
+    /// If approved: materializes work_item rows and advances the session to Finalized.
+    /// If rejected: advances back to Synthesize for another round.
+    /// Only the Super (or autonomous Supervisor) may call this.
+    pub async fn approve_task_draft(
+        &self,
+        session_id: CouncilSessionId,
+        user_id: UserId,
+        draft_entry_id: CouncilEntryId,
+        approved: bool,
+    ) -> Result<Vec<work_item::Model>> {
+        self.transaction(move |tx| async move {
+            let session = council_session::Entity::find_by_id(session_id)
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("no such council session"))?;
+
+            let caller = council_participant::Entity::find()
+                .filter(council_participant::Column::SessionId.eq(session_id))
+                .filter(council_participant::Column::UserId.eq(user_id))
+                .filter(council_participant::Column::Active.eq(true))
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("you are not a participant in this council session"))?;
+            let allowed = caller.kind == CouncilParticipantKind::Super
+                || (caller.kind == CouncilParticipantKind::Supervisor
+                    && session.authority == CouncilAuthority::SupervisorAutonomous);
+            if !allowed {
+                Err(anyhow!(
+                    "only the Super (or an autonomous Supervisor) may approve or reject a draft"
+                ))?;
+            }
+
+            let draft_entry = council_entry::Entity::find_by_id(draft_entry_id)
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("no such draft entry"))?;
+            if draft_entry.session_id != session_id
+                || draft_entry.kind != CouncilEntryKind::TaskDraft
+            {
+                Err(anyhow!("entry is not a task draft for this session"))?;
+            }
+
+            let project_id = session.project_id;
+            let new_phase = if approved {
+                CouncilPhase::Finalized
+            } else {
+                CouncilPhase::Synthesize
+            };
+            let mut session_model = session.into_active_model();
+            session_model.phase = ActiveValue::Set(new_phase);
+            session_model.update(&*tx).await?;
+
+            if !approved {
+                return Ok(Vec::new());
+            }
+
+            let draft_items: Vec<DraftItem> =
+                serde_json::from_str(&draft_entry.body).unwrap_or_default();
+
+            let mut work_items = Vec::with_capacity(draft_items.len());
+            for item in draft_items {
+                let model = work_item::ActiveModel {
+                    project_id: ActiveValue::Set(project_id),
+                    session_id: ActiveValue::Set(session_id),
+                    source_entry_id: ActiveValue::Set(Some(draft_entry_id)),
+                    title: ActiveValue::Set(item.title),
+                    description: ActiveValue::Set(item.description),
+                    status: ActiveValue::Set(WorkItemStatus::Todo),
+                    sort_order: ActiveValue::Set(item.sort_order),
+                    ..Default::default()
+                }
+                .insert(&*tx)
+                .await?;
+                work_items.push(model);
+            }
+            Ok(work_items)
+        })
+        .await
+    }
+
+    /// Upsert a work item (Super may edit title / description / status / assignee).
+    pub async fn upsert_work_item(
+        &self,
+        session_id: CouncilSessionId,
+        item: proto::WorkItem,
+    ) -> Result<work_item::Model> {
+        self.transaction(move |tx| {
+            let item = item.clone();
+            async move {
+                let status = WorkItemStatus::from(item.status());
+                if item.id == 0 {
+                    let session = council_session::Entity::find_by_id(session_id)
+                        .one(&*tx)
+                        .await?
+                        .ok_or_else(|| anyhow!("no such council session"))?;
+                    let model = work_item::ActiveModel {
+                        project_id: ActiveValue::Set(session.project_id),
+                        session_id: ActiveValue::Set(session_id),
+                        status: ActiveValue::Set(status),
+                        title: ActiveValue::Set(item.title),
+                        description: ActiveValue::Set(item.description),
+                        sort_order: ActiveValue::Set(item.sort_order),
+                        ..Default::default()
+                    }
+                    .insert(&*tx)
+                    .await?;
+                    Ok(model)
+                } else {
+                    let work_item_id = WorkItemId::from_proto(item.id);
+                    let existing = work_item::Entity::find_by_id(work_item_id)
+                        .one(&*tx)
+                        .await?
+                        .ok_or_else(|| anyhow!("no such work item"))?;
+                    let mut model = existing.into_active_model();
+                    model.status = ActiveValue::Set(status);
+                    model.title = ActiveValue::Set(item.title);
+                    model.description = ActiveValue::Set(item.description);
+                    model.sort_order = ActiveValue::Set(item.sort_order);
+                    Ok(model.update(&*tx).await?)
+                }
+            }
         })
         .await
     }
@@ -226,6 +486,21 @@ impl Database {
             user_ids.sort_unstable();
             user_ids.dedup();
             Ok(user_ids)
+        })
+        .await
+    }
+
+    /// Public wrapper: load full proto state by session id (for RPC handlers).
+    pub async fn council_session_state(
+        &self,
+        session_id: CouncilSessionId,
+    ) -> Result<proto::CouncilState> {
+        self.transaction(move |tx| async move {
+            let session = council_session::Entity::find_by_id(session_id)
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("no such council session"))?;
+            self.council_state(session, &tx).await
         })
         .await
     }

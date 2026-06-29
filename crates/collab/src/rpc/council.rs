@@ -1,8 +1,8 @@
 use super::{MessageContext, Response};
 use crate::Result;
 use crate::db::{
-    CouncilAuthority, CouncilEntryKind, CouncilParticipantId, CouncilParticipantKind, CouncilPhase,
-    CouncilSessionId, ProjectId,
+    CouncilAuthority, CouncilEntryId, CouncilEntryKind, CouncilParticipantId,
+    CouncilParticipantKind, CouncilPhase, CouncilSessionId, ProjectId,
 };
 use rpc::proto;
 
@@ -142,7 +142,7 @@ pub async fn advance_council_phase(
     let updated = session
         .db()
         .await
-        .advance_council_phase(session_id, phase)
+        .advance_council_phase(session_id, session.user_id(), phase)
         .await?;
     response.send(proto::Ack {})?;
     broadcast_to_council(
@@ -167,7 +167,7 @@ pub async fn set_council_authority(
     let updated = session
         .db()
         .await
-        .set_council_authority(session_id, authority)
+        .set_council_authority(session_id, session.user_id(), authority)
         .await?;
     response.send(proto::Ack {})?;
     broadcast_to_council(
@@ -175,6 +175,126 @@ pub async fn set_council_authority(
         session_id,
         proto::CouncilSessionUpdated {
             session: Some(updated.into()),
+        },
+        false,
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn submit_task_draft(
+    request: proto::SubmitTaskDraft,
+    response: Response<proto::SubmitTaskDraft>,
+    session: MessageContext,
+) -> Result<()> {
+    let session_id = CouncilSessionId::from_proto(request.session_id);
+    let (entry, items) = session
+        .db()
+        .await
+        .submit_task_draft(session_id, session.user_id(), request.items)
+        .await?;
+    let entry: proto::CouncilEntry = entry.into();
+    response.send(proto::SubmitTaskDraftResponse {
+        draft_entry_id: entry.id,
+        items: items.clone(),
+    })?;
+    // Broadcast the TaskDraft entry to all participants.
+    broadcast_to_council(
+        &session,
+        session_id,
+        proto::CouncilEntryPosted {
+            entry: Some(entry),
+        },
+        true,
+    )
+    .await?;
+    // Broadcast the updated session (now in Gate phase).
+    let updated_session = session
+        .db()
+        .await
+        .council_session_state(session_id)
+        .await?;
+    if let Some(session_proto) = updated_session.session {
+        broadcast_to_council(
+            &session,
+            session_id,
+            proto::CouncilSessionUpdated {
+                session: Some(session_proto),
+            },
+            false,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+pub async fn approve_task_draft(
+    request: proto::ApproveTaskDraft,
+    response: Response<proto::ApproveTaskDraft>,
+    session: MessageContext,
+) -> Result<()> {
+    let session_id = CouncilSessionId::from_proto(request.session_id);
+    let draft_entry_id = CouncilEntryId::from_proto(request.draft_entry_id);
+    let work_items = session
+        .db()
+        .await
+        .approve_task_draft(session_id, session.user_id(), draft_entry_id, request.approved)
+        .await?;
+    let work_items: Vec<proto::WorkItem> = work_items.into_iter().map(Into::into).collect();
+    response.send(proto::ApproveTaskDraftResponse {
+        work_items: work_items.clone(),
+    })?;
+    // Broadcast each materialized work item.
+    for item in &work_items {
+        broadcast_to_council(
+            &session,
+            session_id,
+            proto::WorkItemUpdated {
+                item: Some(item.clone()),
+            },
+            false,
+        )
+        .await?;
+    }
+    // Broadcast updated session (Finalized or back to Synthesize).
+    let updated_session = session
+        .db()
+        .await
+        .council_session_state(session_id)
+        .await?;
+    if let Some(session_proto) = updated_session.session {
+        broadcast_to_council(
+            &session,
+            session_id,
+            proto::CouncilSessionUpdated {
+                session: Some(session_proto),
+            },
+            false,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+pub async fn upsert_work_item(
+    request: proto::UpsertWorkItem,
+    response: Response<proto::UpsertWorkItem>,
+    session: MessageContext,
+) -> Result<()> {
+    let session_id = CouncilSessionId::from_proto(request.session_id);
+    let item = request.item.ok_or_else(|| anyhow::anyhow!("missing work item"))?;
+    let updated = session
+        .db()
+        .await
+        .upsert_work_item(session_id, item)
+        .await?;
+    let updated: proto::WorkItem = updated.into();
+    response.send(proto::Ack {})?;
+    broadcast_to_council(
+        &session,
+        session_id,
+        proto::WorkItemUpdated {
+            item: Some(updated),
         },
         false,
     )
