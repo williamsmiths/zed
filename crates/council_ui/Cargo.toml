@@ -1,0 +1,21 @@
+[package]
+name = "council_ui"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/council_panel.rs"
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+council.workspace = true
+gpui.workspace = true
+rpc.workspace = true
+ui.workspace = true
+workspace.workspace = true
