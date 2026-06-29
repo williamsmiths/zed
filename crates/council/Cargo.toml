@@ -1,0 +1,19 @@
+[package]
+name = "council"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/council.rs"
+doctest = false
+
+[dependencies]
+anyhow.workspace = true
+client.workspace = true
+gpui.workspace = true
+rpc.workspace = true
