@@ -124,6 +124,19 @@ impl CouncilStore {
         })
     }
 
+    /// Join the project's council as a peer with a default agent identity.
+    /// Convenience for callers (such as agent tools) that just need to take part.
+    pub fn join_for_project(&self, project_id: u64, cx: &mut Context<Self>) -> Task<Result<()>> {
+        self.join(
+            project_id,
+            proto::CouncilParticipantKind::Peer,
+            "agent".to_string(),
+            String::new(),
+            String::new(),
+            cx,
+        )
+    }
+
     /// Leave the current session.
     pub fn leave(&self, cx: &mut Context<Self>) -> Task<Result<()>> {
         let (Some(session), Some(participant_id)) = (self.session.as_ref(), self.participant_id)

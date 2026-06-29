@@ -2016,7 +2016,7 @@ impl Thread {
         // The council tool is only available when a Council store has been
         // initialized for this app (council::init), i.e. in the full app.
         if let Some(council_store) = council::CouncilStore::try_global(cx) {
-            self.add_tool(CouncilPostTool::new(council_store));
+            self.add_tool(CouncilPostTool::new(council_store, self.project.clone()));
         }
 
         let code_action_store: CodeActionStore = cx.new(|_cx| None);

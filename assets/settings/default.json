@@ -1145,6 +1145,7 @@
           "create_thread": true,
           "delete_path": true,
           "diagnostics": true,
+          "post_to_council": true,
           "apply_code_action": true,
           "edit_file": true,
           "write_file": true,
