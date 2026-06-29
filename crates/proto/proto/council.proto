@@ -1,0 +1,179 @@
+syntax = "proto3";
+package zed.messages;
+
+// Council: a project-scoped, multi-agent deliberation room. A human "Super" has
+// final authority; one Supervisor agent moderates on their behalf; Peer agents
+// (equal) discuss. The session converges on a set of Work Items.
+// See docs/proposals/council-multi-agent.md.
+
+enum CouncilPhase {
+  Frame = 0;
+  Diverge = 1;
+  Converge = 2;
+  Synthesize = 3;
+  Gate = 4;
+  Finalized = 5;
+}
+
+enum CouncilAuthority {
+  HumanFinal = 0;
+  SupervisorAutonomous = 1;
+}
+
+enum CouncilParticipantKind {
+  Super = 0;
+  Supervisor = 1;
+  Peer = 2;
+}
+
+enum CouncilEntryKind {
+  Directive = 0;
+  Analysis = 1;
+  Critique = 2;
+  Proposal = 3;
+  TaskDraft = 4;
+  Approval = 5;
+}
+
+enum WorkItemStatus {
+  Todo = 0;
+  InProgress = 1;
+  Blocked = 2;
+  Done = 3;
+  Cancelled = 4;
+}
+
+message CouncilSession {
+  uint64 id = 1;
+  uint64 project_id = 2;
+  optional uint64 supervisor_participant_id = 3;
+  CouncilPhase phase = 4;
+  uint32 round = 5;
+  CouncilAuthority authority = 6;
+}
+
+message CouncilParticipant {
+  uint64 id = 1;
+  uint64 session_id = 2;
+  CouncilParticipantKind kind = 3;
+  optional uint64 user_id = 4;
+  string agent_label = 5;
+  string model = 6;
+  string tool = 7;
+  uint32 replica_id = 8;
+  bool active = 9;
+}
+
+message CouncilEntry {
+  uint64 id = 1;
+  uint64 session_id = 2;
+  uint64 author_participant_id = 3;
+  uint32 lamport_value = 4;
+  uint32 lamport_replica_id = 5;
+  CouncilEntryKind kind = 6;
+  string body = 7;
+  repeated uint64 refs = 8;
+}
+
+message WorkItem {
+  uint64 id = 1;
+  uint64 project_id = 2;
+  uint64 session_id = 3;
+  optional uint64 source_entry_id = 4;
+  string title = 5;
+  string description = 6;
+  WorkItemStatus status = 7;
+  optional uint64 assignee_participant_id = 8;
+  optional uint64 parent_id = 9;
+  int32 sort_order = 10;
+}
+
+message CouncilState {
+  CouncilSession session = 1;
+  repeated CouncilParticipant participants = 2;
+  repeated CouncilEntry entries = 3;
+  repeated WorkItem work_items = 4;
+}
+
+// --- RPC: requests / responses / broadcasts ---
+
+message JoinCouncil {
+  uint64 project_id = 1;
+  CouncilParticipantKind kind = 2;
+  string agent_label = 3;
+  string model = 4;
+  string tool = 5;
+}
+
+message JoinCouncilResponse {
+  CouncilState state = 1;
+  uint64 participant_id = 2;
+  uint32 replica_id = 3;
+}
+
+message LeaveCouncil {
+  uint64 session_id = 1;
+  uint64 participant_id = 2;
+}
+
+message PostCouncilEntry {
+  uint64 session_id = 1;
+  CouncilEntryKind kind = 2;
+  string body = 3;
+  repeated uint64 refs = 4;
+}
+
+message PostCouncilEntryResponse {
+  CouncilEntry entry = 1;
+}
+
+message CouncilEntryPosted {
+  CouncilEntry entry = 1;
+}
+
+message AdvanceCouncilPhase {
+  uint64 session_id = 1;
+  CouncilPhase phase = 2;
+}
+
+message SetCouncilAuthority {
+  uint64 session_id = 1;
+  CouncilAuthority authority = 2;
+}
+
+message SubmitTaskDraft {
+  uint64 session_id = 1;
+  repeated WorkItem items = 2;
+}
+
+message SubmitTaskDraftResponse {
+  uint64 draft_entry_id = 1;
+  repeated WorkItem items = 2;
+}
+
+message ApproveTaskDraft {
+  uint64 session_id = 1;
+  uint64 draft_entry_id = 2;
+  bool approved = 3;
+}
+
+message ApproveTaskDraftResponse {
+  repeated WorkItem work_items = 1;
+}
+
+message UpsertWorkItem {
+  uint64 session_id = 1;
+  WorkItem item = 2;
+}
+
+message WorkItemUpdated {
+  WorkItem item = 1;
+}
+
+message CouncilParticipantUpdated {
+  CouncilParticipant participant = 1;
+}
+
+message CouncilSessionUpdated {
+  CouncilSession session = 1;
+}

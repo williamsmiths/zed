@@ -443,3 +443,58 @@ CREATE TABLE IF NOT EXISTS "shared_threads" (
 );
 
 CREATE INDEX "index_shared_threads_user_id" ON "shared_threads" ("user_id");
+
+CREATE TABLE "council_sessions" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "project_id" INTEGER NOT NULL,
+    "supervisor_participant_id" INTEGER,
+    "phase" VARCHAR NOT NULL DEFAULT 'frame',
+    "round" INTEGER NOT NULL DEFAULT 0,
+    "authority" VARCHAR NOT NULL DEFAULT 'human_final',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "council_participants" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "session_id" INTEGER NOT NULL REFERENCES council_sessions (id) ON DELETE CASCADE,
+    "kind" VARCHAR NOT NULL,
+    "user_id" INTEGER,
+    "agent_label" VARCHAR NOT NULL DEFAULT '',
+    "model" VARCHAR NOT NULL DEFAULT '',
+    "tool" VARCHAR NOT NULL DEFAULT '',
+    "replica_id" INTEGER NOT NULL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "joined_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "left_at" TIMESTAMP
+);
+CREATE INDEX "index_council_participants_on_session_id" ON "council_participants" ("session_id");
+
+CREATE TABLE "council_entries" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "session_id" INTEGER NOT NULL REFERENCES council_sessions (id) ON DELETE CASCADE,
+    "author_participant_id" INTEGER NOT NULL REFERENCES council_participants (id),
+    "lamport_value" INTEGER NOT NULL,
+    "lamport_replica_id" INTEGER NOT NULL,
+    "kind" VARCHAR NOT NULL,
+    "body" TEXT NOT NULL,
+    "refs" TEXT NOT NULL DEFAULT '[]',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX "index_council_entries_on_session_id" ON "council_entries" ("session_id");
+
+CREATE TABLE "work_items" (
+    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+    "project_id" INTEGER NOT NULL,
+    "session_id" INTEGER NOT NULL REFERENCES council_sessions (id) ON DELETE CASCADE,
+    "source_entry_id" INTEGER REFERENCES council_entries (id),
+    "title" TEXT NOT NULL,
+    "description" TEXT NOT NULL DEFAULT '',
+    "status" VARCHAR NOT NULL DEFAULT 'todo',
+    "assignee_participant_id" INTEGER REFERENCES council_participants (id),
+    "parent_id" INTEGER,
+    "sort_order" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX "index_work_items_on_session_id" ON "work_items" ("session_id");

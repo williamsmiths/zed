@@ -1,5 +1,6 @@
 mod buffer_tests;
 mod channel_tests;
+mod council_tests;
 mod db_tests;
 mod extension_tests;
 mod migrations;

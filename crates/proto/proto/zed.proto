@@ -7,6 +7,7 @@ import "buffer.proto";
 import "call.proto";
 import "channel.proto";
 import "core.proto";
+import "council.proto";
 import "debugger.proto";
 import "download.proto";
 import "git.proto";
@@ -490,7 +491,23 @@ message Envelope {
     ResolveDocumentLink resolve_document_link = 455;
     ResolveDocumentLinkResponse resolve_document_link_response = 456;
     GitWorktreeCreatedAt git_worktree_created_at = 457;
-    GitWorktreeCreatedAtResponse git_worktree_created_at_response = 458; // current max
+    GitWorktreeCreatedAtResponse git_worktree_created_at_response = 458;
+    JoinCouncil join_council = 459;
+    JoinCouncilResponse join_council_response = 460;
+    LeaveCouncil leave_council = 461;
+    PostCouncilEntry post_council_entry = 462;
+    PostCouncilEntryResponse post_council_entry_response = 463;
+    CouncilEntryPosted council_entry_posted = 464;
+    AdvanceCouncilPhase advance_council_phase = 465;
+    SetCouncilAuthority set_council_authority = 466;
+    SubmitTaskDraft submit_task_draft = 467;
+    SubmitTaskDraftResponse submit_task_draft_response = 468;
+    ApproveTaskDraft approve_task_draft = 469;
+    ApproveTaskDraftResponse approve_task_draft_response = 470;
+    UpsertWorkItem upsert_work_item = 471;
+    WorkItemUpdated work_item_updated = 472;
+    CouncilParticipantUpdated council_participant_updated = 473;
+    CouncilSessionUpdated council_session_updated = 474; // current max
   }
 
   reserved 87 to 88;

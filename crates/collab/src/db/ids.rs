@@ -91,6 +91,212 @@ id_type!(RoomParticipantId);
 id_type!(ServerId);
 id_type!(SignupId);
 id_type!(UserId);
+id_type!(CouncilSessionId);
+id_type!(CouncilParticipantId);
+id_type!(CouncilEntryId);
+id_type!(WorkItemId);
+
+/// The lifecycle phase of a council session.
+#[derive(
+    Eq, PartialEq, Copy, Clone, Debug, EnumIter, DeriveActiveEnum, Hash, Serialize, Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum CouncilPhase {
+    #[sea_orm(string_value = "frame")]
+    Frame,
+    #[sea_orm(string_value = "diverge")]
+    Diverge,
+    #[sea_orm(string_value = "converge")]
+    Converge,
+    #[sea_orm(string_value = "synthesize")]
+    Synthesize,
+    #[sea_orm(string_value = "gate")]
+    Gate,
+    #[sea_orm(string_value = "finalized")]
+    Finalized,
+}
+
+impl From<proto::CouncilPhase> for CouncilPhase {
+    fn from(value: proto::CouncilPhase) -> Self {
+        match value {
+            proto::CouncilPhase::Frame => CouncilPhase::Frame,
+            proto::CouncilPhase::Diverge => CouncilPhase::Diverge,
+            proto::CouncilPhase::Converge => CouncilPhase::Converge,
+            proto::CouncilPhase::Synthesize => CouncilPhase::Synthesize,
+            proto::CouncilPhase::Gate => CouncilPhase::Gate,
+            proto::CouncilPhase::Finalized => CouncilPhase::Finalized,
+        }
+    }
+}
+
+impl From<CouncilPhase> for proto::CouncilPhase {
+    fn from(value: CouncilPhase) -> Self {
+        match value {
+            CouncilPhase::Frame => proto::CouncilPhase::Frame,
+            CouncilPhase::Diverge => proto::CouncilPhase::Diverge,
+            CouncilPhase::Converge => proto::CouncilPhase::Converge,
+            CouncilPhase::Synthesize => proto::CouncilPhase::Synthesize,
+            CouncilPhase::Gate => proto::CouncilPhase::Gate,
+            CouncilPhase::Finalized => proto::CouncilPhase::Finalized,
+        }
+    }
+}
+
+/// Who has final authority in a council session.
+#[derive(
+    Eq, PartialEq, Copy, Clone, Debug, EnumIter, DeriveActiveEnum, Hash, Serialize, Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum CouncilAuthority {
+    #[sea_orm(string_value = "human_final")]
+    HumanFinal,
+    #[sea_orm(string_value = "supervisor_autonomous")]
+    SupervisorAutonomous,
+}
+
+impl From<proto::CouncilAuthority> for CouncilAuthority {
+    fn from(value: proto::CouncilAuthority) -> Self {
+        match value {
+            proto::CouncilAuthority::HumanFinal => CouncilAuthority::HumanFinal,
+            proto::CouncilAuthority::SupervisorAutonomous => {
+                CouncilAuthority::SupervisorAutonomous
+            }
+        }
+    }
+}
+
+impl From<CouncilAuthority> for proto::CouncilAuthority {
+    fn from(value: CouncilAuthority) -> Self {
+        match value {
+            CouncilAuthority::HumanFinal => proto::CouncilAuthority::HumanFinal,
+            CouncilAuthority::SupervisorAutonomous => {
+                proto::CouncilAuthority::SupervisorAutonomous
+            }
+        }
+    }
+}
+
+/// The role a participant plays in a council session.
+#[derive(
+    Eq, PartialEq, Copy, Clone, Debug, EnumIter, DeriveActiveEnum, Hash, Serialize, Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum CouncilParticipantKind {
+    #[sea_orm(string_value = "super")]
+    Super,
+    #[sea_orm(string_value = "supervisor")]
+    Supervisor,
+    #[sea_orm(string_value = "peer")]
+    Peer,
+}
+
+impl From<proto::CouncilParticipantKind> for CouncilParticipantKind {
+    fn from(value: proto::CouncilParticipantKind) -> Self {
+        match value {
+            proto::CouncilParticipantKind::Super => CouncilParticipantKind::Super,
+            proto::CouncilParticipantKind::Supervisor => CouncilParticipantKind::Supervisor,
+            proto::CouncilParticipantKind::Peer => CouncilParticipantKind::Peer,
+        }
+    }
+}
+
+impl From<CouncilParticipantKind> for proto::CouncilParticipantKind {
+    fn from(value: CouncilParticipantKind) -> Self {
+        match value {
+            CouncilParticipantKind::Super => proto::CouncilParticipantKind::Super,
+            CouncilParticipantKind::Supervisor => proto::CouncilParticipantKind::Supervisor,
+            CouncilParticipantKind::Peer => proto::CouncilParticipantKind::Peer,
+        }
+    }
+}
+
+/// The kind of a council entry (one message on the shared blackboard).
+#[derive(
+    Eq, PartialEq, Copy, Clone, Debug, EnumIter, DeriveActiveEnum, Hash, Serialize, Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum CouncilEntryKind {
+    #[sea_orm(string_value = "directive")]
+    Directive,
+    #[sea_orm(string_value = "analysis")]
+    Analysis,
+    #[sea_orm(string_value = "critique")]
+    Critique,
+    #[sea_orm(string_value = "proposal")]
+    Proposal,
+    #[sea_orm(string_value = "task_draft")]
+    TaskDraft,
+    #[sea_orm(string_value = "approval")]
+    Approval,
+}
+
+impl From<proto::CouncilEntryKind> for CouncilEntryKind {
+    fn from(value: proto::CouncilEntryKind) -> Self {
+        match value {
+            proto::CouncilEntryKind::Directive => CouncilEntryKind::Directive,
+            proto::CouncilEntryKind::Analysis => CouncilEntryKind::Analysis,
+            proto::CouncilEntryKind::Critique => CouncilEntryKind::Critique,
+            proto::CouncilEntryKind::Proposal => CouncilEntryKind::Proposal,
+            proto::CouncilEntryKind::TaskDraft => CouncilEntryKind::TaskDraft,
+            proto::CouncilEntryKind::Approval => CouncilEntryKind::Approval,
+        }
+    }
+}
+
+impl From<CouncilEntryKind> for proto::CouncilEntryKind {
+    fn from(value: CouncilEntryKind) -> Self {
+        match value {
+            CouncilEntryKind::Directive => proto::CouncilEntryKind::Directive,
+            CouncilEntryKind::Analysis => proto::CouncilEntryKind::Analysis,
+            CouncilEntryKind::Critique => proto::CouncilEntryKind::Critique,
+            CouncilEntryKind::Proposal => proto::CouncilEntryKind::Proposal,
+            CouncilEntryKind::TaskDraft => proto::CouncilEntryKind::TaskDraft,
+            CouncilEntryKind::Approval => proto::CouncilEntryKind::Approval,
+        }
+    }
+}
+
+/// The status of a work item.
+#[derive(
+    Eq, PartialEq, Copy, Clone, Debug, EnumIter, DeriveActiveEnum, Hash, Serialize, Deserialize,
+)]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
+pub enum WorkItemStatus {
+    #[sea_orm(string_value = "todo")]
+    Todo,
+    #[sea_orm(string_value = "in_progress")]
+    InProgress,
+    #[sea_orm(string_value = "blocked")]
+    Blocked,
+    #[sea_orm(string_value = "done")]
+    Done,
+    #[sea_orm(string_value = "cancelled")]
+    Cancelled,
+}
+
+impl From<proto::WorkItemStatus> for WorkItemStatus {
+    fn from(value: proto::WorkItemStatus) -> Self {
+        match value {
+            proto::WorkItemStatus::Todo => WorkItemStatus::Todo,
+            proto::WorkItemStatus::InProgress => WorkItemStatus::InProgress,
+            proto::WorkItemStatus::Blocked => WorkItemStatus::Blocked,
+            proto::WorkItemStatus::Done => WorkItemStatus::Done,
+            proto::WorkItemStatus::Cancelled => WorkItemStatus::Cancelled,
+        }
+    }
+}
+
+impl From<WorkItemStatus> for proto::WorkItemStatus {
+    fn from(value: WorkItemStatus) -> Self {
+        match value {
+            WorkItemStatus::Todo => proto::WorkItemStatus::Todo,
+            WorkItemStatus::InProgress => proto::WorkItemStatus::InProgress,
+            WorkItemStatus::Blocked => proto::WorkItemStatus::Blocked,
+            WorkItemStatus::Done => proto::WorkItemStatus::Done,
+            WorkItemStatus::Cancelled => proto::WorkItemStatus::Cancelled,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, DeriveValueType)]
 pub struct SharedThreadId(pub Uuid);

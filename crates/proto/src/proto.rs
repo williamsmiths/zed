@@ -382,6 +382,22 @@ messages!(
     (KillKernel, Background),
     (GetRemoteProfilingData, Background),
     (GetRemoteProfilingDataResponse, Background),
+    (JoinCouncil, Foreground),
+    (JoinCouncilResponse, Foreground),
+    (LeaveCouncil, Foreground),
+    (PostCouncilEntry, Foreground),
+    (PostCouncilEntryResponse, Foreground),
+    (CouncilEntryPosted, Foreground),
+    (AdvanceCouncilPhase, Foreground),
+    (SetCouncilAuthority, Foreground),
+    (SubmitTaskDraft, Foreground),
+    (SubmitTaskDraftResponse, Foreground),
+    (ApproveTaskDraft, Foreground),
+    (ApproveTaskDraftResponse, Foreground),
+    (UpsertWorkItem, Foreground),
+    (WorkItemUpdated, Foreground),
+    (CouncilParticipantUpdated, Foreground),
+    (CouncilSessionUpdated, Foreground),
 );
 
 request_messages!(
@@ -597,6 +613,14 @@ request_messages!(
     (SpawnKernel, SpawnKernelResponse),
     (KillKernel, Ack),
     (GetRemoteProfilingData, GetRemoteProfilingDataResponse),
+    (JoinCouncil, JoinCouncilResponse),
+    (LeaveCouncil, Ack),
+    (PostCouncilEntry, PostCouncilEntryResponse),
+    (AdvanceCouncilPhase, Ack),
+    (SetCouncilAuthority, Ack),
+    (SubmitTaskDraft, SubmitTaskDraftResponse),
+    (ApproveTaskDraft, ApproveTaskDraftResponse),
+    (UpsertWorkItem, Ack),
 );
 
 lsp_messages!(

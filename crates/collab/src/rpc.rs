@@ -1,4 +1,5 @@
 mod connection_pool;
+mod council;
 
 use crate::api::{CloudflareIpCountryHeader, SystemIdHeader};
 use crate::entities::User;
@@ -438,6 +439,11 @@ impl Server {
             .add_request_handler(remove_contact)
             .add_request_handler(respond_to_contact_request)
             .add_message_handler(subscribe_to_channels)
+            .add_request_handler(council::join_council)
+            .add_request_handler(council::leave_council)
+            .add_request_handler(council::post_council_entry)
+            .add_request_handler(council::advance_council_phase)
+            .add_request_handler(council::set_council_authority)
             .add_request_handler(create_channel)
             .add_request_handler(delete_channel)
             .add_request_handler(invite_channel_member)
