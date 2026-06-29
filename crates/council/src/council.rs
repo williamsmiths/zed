@@ -187,6 +187,13 @@ impl CouncilStore {
         })
     }
 
+    /// Post a plain analysis message to the council. Convenience over
+    /// `post_entry` for callers (such as agent tools) that don't need to pick an
+    /// entry kind or references.
+    pub fn post_message(&self, body: String, cx: &mut Context<Self>) -> Task<Result<()>> {
+        self.post_entry(proto::CouncilEntryKind::Analysis, body, Vec::new(), cx)
+    }
+
     /// Advance the session phase (the Supervisor's prerogative).
     pub fn advance_phase(
         &self,

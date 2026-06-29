@@ -1,5 +1,5 @@
 use crate::{
-    ApplyCodeActionTool, CodeActionStore, ContextServerRegistry, CopyPathTool, CreateDirectoryTool,
+    ApplyCodeActionTool, CodeActionStore, ContextServerRegistry, CopyPathTool, CouncilPostTool, CreateDirectoryTool,
     CreateThreadTool, DbLanguageModel, DbThread, DeletePathTool, DiagnosticsTool, EditFileTool,
     FetchTool, FindPathTool, FindReferencesTool, GetCodeActionsTool, GoToDefinitionTool, GrepTool,
     ListAgentsAndModelsTool, ListDirectoryTool, MovePathTool, ProjectSnapshot, ReadFileTool,
@@ -2012,6 +2012,12 @@ impl Thread {
         self.add_tool(WebSearchTool);
 
         self.add_tool(DiagnosticsTool::new(self.project.clone()));
+
+        // The council tool is only available when a Council store has been
+        // initialized for this app (council::init), i.e. in the full app.
+        if let Some(council_store) = council::CouncilStore::try_global(cx) {
+            self.add_tool(CouncilPostTool::new(council_store));
+        }
 
         let code_action_store: CodeActionStore = cx.new(|_cx| None);
         self.add_tool(FindReferencesTool::new(self.project.clone()));
