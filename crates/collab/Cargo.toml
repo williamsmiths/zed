@@ -86,6 +86,7 @@ collab = { workspace = true, features = ["test-support"] }
 collab_ui = { workspace = true, features = ["test-support"] }
 collections = { workspace = true, features = ["test-support"] }
 command_palette_hooks.workspace = true
+council.workspace = true
 
 ctor.workspace = true
 dap = { workspace = true, features = ["test-support"] }

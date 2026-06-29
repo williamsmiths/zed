@@ -8,6 +8,7 @@ mod channel_buffer_tests;
 mod channel_guest_tests;
 mod channel_tests;
 mod collab_panel_tests;
+mod council_client_tests;
 mod db_tests;
 mod editor_tests;
 mod following_tests;

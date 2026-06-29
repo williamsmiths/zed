@@ -352,6 +352,7 @@ impl TestServer {
             workspace::init(app_state.clone(), cx);
             call::init(client.clone(), user_store.clone(), cx);
             channel::init(&client, user_store.clone(), cx);
+            council::init(&client, user_store.clone(), cx);
             notifications::init(client.clone(), user_store, cx);
             collab_ui::init(&app_state, cx);
             file_finder::init(cx);
