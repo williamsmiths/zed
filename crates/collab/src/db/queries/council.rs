@@ -59,6 +59,7 @@ impl Database {
                         project_id: ActiveValue::Set(project_id),
                         phase: ActiveValue::Set(CouncilPhase::Frame),
                         round: ActiveValue::Set(0),
+                        round_cap: ActiveValue::Set(0),
                         authority: ActiveValue::Set(CouncilAuthority::HumanFinal),
                         ..Default::default()
                     }
@@ -229,8 +230,25 @@ impl Database {
                 ))?;
             }
 
+            // Enforce round_cap: each transition to Converge counts as a new round.
+            let entering_converge = phase == CouncilPhase::Converge;
+            let new_round = if entering_converge {
+                session.round + 1
+            } else {
+                session.round
+            };
+            if entering_converge && session.round_cap > 0 && new_round > session.round_cap {
+                Err(anyhow!(
+                    "round cap of {} reached; session cannot enter Converge again",
+                    session.round_cap
+                ))?;
+            }
+
             let mut session = session.into_active_model();
             session.phase = ActiveValue::Set(phase);
+            if entering_converge {
+                session.round = ActiveValue::Set(new_round);
+            }
             Ok(session.update(&*tx).await?)
         })
         .await
@@ -262,6 +280,36 @@ impl Database {
                 .ok_or_else(|| anyhow!("no such council session"))?;
             let mut session = session.into_active_model();
             session.authority = ActiveValue::Set(authority);
+            Ok(session.update(&*tx).await?)
+        })
+        .await
+    }
+
+    /// Set the round cap for a council session (Super only).
+    /// 0 = unlimited; N = max N Converge phases allowed.
+    pub async fn set_round_cap(
+        &self,
+        session_id: CouncilSessionId,
+        user_id: UserId,
+        round_cap: i32,
+    ) -> Result<council_session::Model> {
+        self.transaction(move |tx| async move {
+            let caller = council_participant::Entity::find()
+                .filter(council_participant::Column::SessionId.eq(session_id))
+                .filter(council_participant::Column::UserId.eq(user_id))
+                .filter(council_participant::Column::Active.eq(true))
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("you are not a participant in this council session"))?;
+            if caller.kind != CouncilParticipantKind::Super {
+                Err(anyhow!("only the Super may set the round cap"))?;
+            }
+            let session = council_session::Entity::find_by_id(session_id)
+                .one(&*tx)
+                .await?
+                .ok_or_else(|| anyhow!("no such council session"))?;
+            let mut session = session.into_active_model();
+            session.round_cap = ActiveValue::Set(round_cap);
             Ok(session.update(&*tx).await?)
         })
         .await

@@ -11,6 +11,7 @@ pub struct Model {
     pub supervisor_participant_id: Option<CouncilParticipantId>,
     pub phase: CouncilPhase,
     pub round: i32,
+    pub round_cap: i32,
     pub authority: CouncilAuthority,
 }
 
@@ -27,6 +28,7 @@ impl From<Model> for proto::CouncilSession {
             supervisor_participant_id: session.supervisor_participant_id.map(|id| id.to_proto()),
             phase: proto::CouncilPhase::from(session.phase) as i32,
             round: session.round as u32,
+            round_cap: session.round_cap as u32,
             authority: proto::CouncilAuthority::from(session.authority) as i32,
         }
     }

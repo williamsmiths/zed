@@ -18,6 +18,11 @@ test_both_dbs!(
     test_council_submit_approve_postgres,
     test_council_submit_approve_sqlite
 );
+test_both_dbs!(
+    test_council_round_cap,
+    test_council_round_cap_postgres,
+    test_council_round_cap_sqlite
+);
 
 async fn test_council(db: &Arc<Database>) {
     let super_user = new_test_user(db).await;
@@ -382,4 +387,71 @@ async fn test_council_submit_approve(db: &Arc<Database>) {
         state2.session.unwrap().phase(),
         proto::CouncilPhase::Synthesize
     );
+}
+
+async fn test_council_round_cap(db: &Arc<Database>) {
+    let super_user = new_test_user(db).await;
+    let supervisor = new_test_user(db).await;
+    let project_id = ProjectId::from_proto(5);
+
+    db.join_council(
+        project_id,
+        CouncilParticipantKind::Super,
+        Some(super_user),
+        String::new(),
+        String::new(),
+        String::new(),
+    )
+    .await
+    .unwrap();
+    let (_, state) = db
+        .join_council(
+            project_id,
+            CouncilParticipantKind::Supervisor,
+            Some(supervisor),
+            String::new(),
+            String::new(),
+            String::new(),
+        )
+        .await
+        .unwrap();
+    let session_id = CouncilSessionId::from_proto(state.session.unwrap().id);
+
+    // Set round_cap to 2 (Super only).
+    db.set_round_cap(session_id, super_user, 2).await.unwrap();
+
+    // Peer may NOT set round_cap.
+    assert!(db.set_round_cap(session_id, supervisor, 99).await.is_err());
+
+    // Enter Converge once (round → 1).
+    db.advance_council_phase(session_id, supervisor, CouncilPhase::Diverge)
+        .await
+        .unwrap();
+    db.advance_council_phase(session_id, supervisor, CouncilPhase::Converge)
+        .await
+        .unwrap();
+
+    // Cycle back through Diverge and Converge again (round → 2).
+    db.advance_council_phase(session_id, supervisor, CouncilPhase::Diverge)
+        .await
+        .unwrap();
+    db.advance_council_phase(session_id, supervisor, CouncilPhase::Converge)
+        .await
+        .unwrap();
+
+    // Third attempt to enter Converge should fail (cap = 2, round would become 3 > 2).
+    db.advance_council_phase(session_id, supervisor, CouncilPhase::Diverge)
+        .await
+        .unwrap();
+    assert!(
+        db.advance_council_phase(session_id, supervisor, CouncilPhase::Converge)
+            .await
+            .is_err()
+    );
+
+    // Verify round is 2 in the session state.
+    let state = db.council_session_state(session_id).await.unwrap();
+    let session = state.session.unwrap();
+    assert_eq!(session.round, 2);
+    assert_eq!(session.round_cap, 2);
 }

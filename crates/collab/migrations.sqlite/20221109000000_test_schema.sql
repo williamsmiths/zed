@@ -450,6 +450,7 @@ CREATE TABLE "council_sessions" (
     "supervisor_participant_id" INTEGER,
     "phase" VARCHAR NOT NULL DEFAULT 'frame',
     "round" INTEGER NOT NULL DEFAULT 0,
+    "round_cap" INTEGER NOT NULL DEFAULT 0,
     "authority" VARCHAR NOT NULL DEFAULT 'human_final',
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

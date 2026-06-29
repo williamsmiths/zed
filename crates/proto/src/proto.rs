@@ -398,6 +398,7 @@ messages!(
     (WorkItemUpdated, Foreground),
     (CouncilParticipantUpdated, Foreground),
     (CouncilSessionUpdated, Foreground),
+    (SetRoundCap, Foreground),
     (GetCouncilState, Foreground),
     (GetCouncilStateResponse, Foreground),
 );
@@ -623,6 +624,7 @@ request_messages!(
     (SubmitTaskDraft, SubmitTaskDraftResponse),
     (ApproveTaskDraft, ApproveTaskDraftResponse),
     (UpsertWorkItem, Ack),
+    (SetRoundCap, Ack),
     (GetCouncilState, GetCouncilStateResponse),
 );
 

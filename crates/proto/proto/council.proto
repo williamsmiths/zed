@@ -50,6 +50,7 @@ message CouncilSession {
   CouncilPhase phase = 4;
   uint32 round = 5;
   CouncilAuthority authority = 6;
+  uint32 round_cap = 7;  // 0 = unlimited
 }
 
 message CouncilParticipant {
@@ -176,6 +177,11 @@ message CouncilParticipantUpdated {
 
 message CouncilSessionUpdated {
   CouncilSession session = 1;
+}
+
+message SetRoundCap {
+  uint64 session_id = 1;
+  uint32 round_cap = 2;
 }
 
 message GetCouncilState {

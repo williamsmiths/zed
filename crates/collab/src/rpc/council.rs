@@ -314,3 +314,26 @@ pub async fn get_council_state(
     })?;
     Ok(())
 }
+
+pub async fn set_round_cap(
+    request: proto::SetRoundCap,
+    response: Response<proto::SetRoundCap>,
+    session: MessageContext,
+) -> Result<()> {
+    let session_id = CouncilSessionId::from_proto(request.session_id);
+    let updated = session
+        .db()
+        .await
+        .set_round_cap(session_id, session.user_id(), request.round_cap as i32)
+        .await?;
+    let updated: proto::CouncilSession = updated.into();
+    response.send(proto::Ack {})?;
+    broadcast_to_council(
+        &session,
+        session_id,
+        proto::CouncilSessionUpdated { session: Some(updated) },
+        true,
+    )
+    .await?;
+    Ok(())
+}

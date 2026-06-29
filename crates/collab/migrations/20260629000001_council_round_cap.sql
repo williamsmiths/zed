@@ -1,0 +1,1 @@
+ALTER TABLE council_sessions ADD COLUMN round_cap INTEGER NOT NULL DEFAULT 0;
