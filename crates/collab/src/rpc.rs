@@ -447,6 +447,7 @@ impl Server {
             .add_request_handler(council::submit_task_draft)
             .add_request_handler(council::approve_task_draft)
             .add_request_handler(council::upsert_work_item)
+            .add_request_handler(council::get_council_state)
             .add_request_handler(create_channel)
             .add_request_handler(delete_channel)
             .add_request_handler(invite_channel_member)

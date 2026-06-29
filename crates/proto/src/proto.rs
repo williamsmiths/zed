@@ -398,6 +398,8 @@ messages!(
     (WorkItemUpdated, Foreground),
     (CouncilParticipantUpdated, Foreground),
     (CouncilSessionUpdated, Foreground),
+    (GetCouncilState, Foreground),
+    (GetCouncilStateResponse, Foreground),
 );
 
 request_messages!(
@@ -621,6 +623,7 @@ request_messages!(
     (SubmitTaskDraft, SubmitTaskDraftResponse),
     (ApproveTaskDraft, ApproveTaskDraftResponse),
     (UpsertWorkItem, Ack),
+    (GetCouncilState, GetCouncilStateResponse),
 );
 
 lsp_messages!(

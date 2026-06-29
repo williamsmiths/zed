@@ -177,3 +177,11 @@ message CouncilParticipantUpdated {
 message CouncilSessionUpdated {
   CouncilSession session = 1;
 }
+
+message GetCouncilState {
+  uint64 session_id = 1;
+}
+
+message GetCouncilStateResponse {
+  CouncilState state = 1;
+}

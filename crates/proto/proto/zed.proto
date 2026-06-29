@@ -507,7 +507,9 @@ message Envelope {
     UpsertWorkItem upsert_work_item = 471;
     WorkItemUpdated work_item_updated = 472;
     CouncilParticipantUpdated council_participant_updated = 473;
-    CouncilSessionUpdated council_session_updated = 474; // current max
+    CouncilSessionUpdated council_session_updated = 474;
+    GetCouncilState get_council_state = 475;
+    GetCouncilStateResponse get_council_state_response = 476; // current max
   }
 
   reserved 87 to 88;

@@ -301,3 +301,16 @@ pub async fn upsert_work_item(
     .await?;
     Ok(())
 }
+
+pub async fn get_council_state(
+    request: proto::GetCouncilState,
+    response: Response<proto::GetCouncilState>,
+    session: MessageContext,
+) -> Result<()> {
+    let session_id = CouncilSessionId::from_proto(request.session_id);
+    let state = session.db().await.council_session_state(session_id).await?;
+    response.send(proto::GetCouncilStateResponse {
+        state: Some(state),
+    })?;
+    Ok(())
+}

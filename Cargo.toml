@@ -43,6 +43,7 @@ members = [
     "crates/copilot",
     "crates/copilot_chat",
     "crates/council",
+    "crates/council_mcp",
     "crates/council_ui",
     "crates/crashes",
     "crates/credentials_provider",
@@ -310,6 +311,7 @@ copilot = { path = "crates/copilot" }
 copilot_chat = { path = "crates/copilot_chat" }
 copilot_ui = { path = "crates/copilot_ui" }
 council = { path = "crates/council" }
+council_mcp = { path = "crates/council_mcp" }
 council_ui = { path = "crates/council_ui" }
 crashes = { path = "crates/crashes" }
 credentials_provider = { path = "crates/credentials_provider" }
